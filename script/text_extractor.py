@@ -6,6 +6,7 @@ import PyPDF2
 from paddleocr import PaddleOCR
 import cv2
 import json
+import os
 from pathlib import Path
 from typing import List, Dict, Tuple
 import logging
@@ -106,34 +107,85 @@ class BBoxGenerator:
     
     def detect_text_regions(self, image_path: str) -> List[Dict]:
         """
-        Detect text regions trong ảnh
+        Detect text regions trong ảnh với error handling tốt hơn
         Returns:
             List of dict containing bbox coordinates and recognized text
         """
         logger.info(f"Detecting text in: {image_path}")
         
-        result = self.ocr.ocr(image_path)
-        
-        if not result or not result[0]:
-            logger.warning(f"No text detected in {image_path}")
-            return []
-        
-        text_regions = []
-        for idx, line in enumerate(result[0]):
-            bbox = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-            text_info = line[1]  # (text, confidence)
+        try:
+            # Kiểm tra file tồn tại
+            if not os.path.exists(image_path):
+                logger.error(f"Image file not found: {image_path}")
+                return []
             
-            text_regions.append({
-                'id': idx,
-                'bbox': bbox,
-                'text': text_info[0],
-                'confidence': text_info[1],
-                # Tính toán bounding box rectangle (x, y, w, h)
-                'rect': self._bbox_to_rect(bbox)
-            })
-        
-        logger.info(f"Detected {len(text_regions)} text regions")
-        return text_regions
+            # Kiểm tra ảnh có thể đọc được không
+            import cv2
+            test_img = cv2.imread(image_path)
+            if test_img is None:
+                logger.error(f"Cannot read image: {image_path}")
+                return []
+            
+            # Chạy OCR
+            result = self.ocr.ocr(image_path)
+            
+            # Kiểm tra kết quả OCR
+            if not result:
+                logger.warning(f"OCR returned None for {image_path}")
+                return []
+                
+            if not isinstance(result, list) or len(result) == 0:
+                logger.warning(f"OCR returned empty result for {image_path}")
+                return []
+                
+            if not result[0]:
+                logger.warning(f"No text detected in {image_path}")
+                return []
+            
+            text_regions = []
+            for idx, line in enumerate(result[0]):
+                try:
+                    # Kiểm tra format của line
+                    if not isinstance(line, (list, tuple)) or len(line) < 2:
+                        logger.warning(f"Invalid line format at index {idx}: {line}")
+                        continue
+                    
+                    bbox = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                    text_info = line[1]  # (text, confidence)
+                    
+                    # Kiểm tra bbox format
+                    if not isinstance(bbox, list) or len(bbox) != 4:
+                        logger.warning(f"Invalid bbox format at index {idx}: {bbox}")
+                        continue
+                    
+                    # Kiểm tra text_info format
+                    if not isinstance(text_info, (list, tuple)) or len(text_info) < 2:
+                        logger.warning(f"Invalid text_info format at index {idx}: {text_info}")
+                        continue
+                    
+                    text = str(text_info[0]) if text_info[0] is not None else ""
+                    confidence = float(text_info[1]) if text_info[1] is not None else 0.0
+                    
+                    # Chỉ thêm nếu có text
+                    if text.strip():
+                        text_regions.append({
+                            'id': idx,
+                            'bbox': bbox,
+                            'text': text,
+                            'confidence': confidence,
+                            'rect': self._bbox_to_rect(bbox)
+                        })
+                    
+                except Exception as line_error:
+                    logger.warning(f"Error processing line {idx}: {line_error}")
+                    continue
+            
+            logger.info(f"Detected {len(text_regions)} valid text regions")
+            return text_regions
+            
+        except Exception as e:
+            logger.error(f"Error in detect_text_regions: {e}")
+            return []
     
     def _bbox_to_rect(self, bbox: List[List[float]]) -> Dict[str, int]:
         """Convert bbox 4 điểm sang rectangle (x, y, width, height)"""
