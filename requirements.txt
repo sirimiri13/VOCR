@@ -1,0 +1,20 @@
+# Core dependencies for Colab
+paddlepaddle
+paddleocr
+opencv-python
+pillow
+pymupdf
+pdf2image
+python-Levenshtein
+numpy
+
+# Data science & visualization
+matplotlib
+tqdm
+
+# For local development
+jupyter
+jupyterlab
+ipykernel
+
+# Note: poppler-utils will be installed via apt-get in Colab
