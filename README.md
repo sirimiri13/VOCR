@@ -2,24 +2,14 @@
 
 Pipeline xử lý OCR tiếng Việt sử dụng PaddleOCR với khả năng chạy trên cả môi trường local và Google Colab.
 
-## 🚀 Chạy trên Google Colab (Khuyến nghị)
 
-### Bước 1: Upload lên GitHub
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/your-username/VOCR.git
-git push -u origin main
-```
 
-### Bước 2: Mở Colab
+### Mở Colab
 1. Truy cập [Google Colab](https://colab.research.google.com)
 2. Upload file `colab_pipeline.ipynb` hoặc
 3. Clone repository trực tiếp trong Colab
 
-### Bước 3: Chạy pipeline
+### Chạy pipeline
 - Chạy từng cell theo thứ tự trong `colab_pipeline.ipynb`
 - Pipeline sẽ tự động cài đặt dependencies
 - Sử dụng GPU miễn phí của Colab cho tốc độ xử lý nhanh hơn
