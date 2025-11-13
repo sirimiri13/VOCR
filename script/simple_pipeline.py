@@ -24,11 +24,11 @@ import re
 # ===================== CONFIG =====================
 class Config:
     # Input
-    RAW_IMAGES_DIR = Path('/Users/huonglam/Library/Mobile Documents/com~apple~CloudDocs/Documents/Master/Tốt nghiệp/VOCR/data/convert/image')
-    RAW_GT_DIR = Path('/Users/huonglam/Library/Mobile Documents/com~apple~CloudDocs/Documents/Master/Tốt nghiệp/VOCR/data/processed/text')
+    RAW_IMAGES_DIR = Path('/data/convert/image')
+    RAW_GT_DIR = Path('/data/processed/text')
     
     # Output
-    OUTPUT_DIR = Path('/Users/huonglam/Library/Mobile Documents/com~apple~CloudDocs/Documents/Master/Tốt nghiệp/VOCR/data/processed')
+    OUTPUT_DIR = Path('/data/processed')
     PREPROCESSED_DIR = OUTPUT_DIR / 'preprocessed'
     DETECTION_DIR = OUTPUT_DIR / 'detection'
     DATASET_DIR = OUTPUT_DIR / 'dataset'
