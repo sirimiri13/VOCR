@@ -39,7 +39,6 @@ class DatasetBuilder:
             use_angle_cls=True,
             lang='vi',
             use_gpu=True,  # Sử dụng GPU trên Kaggle
-            show_log=False
         )
         
     def setup_directories(self):
@@ -164,26 +163,35 @@ class DatasetBuilder:
     # BƯỚC 2: TRÍCH XUẤT TEXT TỪ PDF
     # ============================================================
     
-    def extract_text_from_pdf(self, pdf_path: str, output_path: str = None) -> str:
+    def extract_text_from_pdf(self, pdf_path: str, page_num: int = None, output_path: str = None) -> str:
         """
         Trích xuất text từ PDF text (không phải PDF ảnh)
         
         Args:
             pdf_path: Đường dẫn file PDF
+            page_num: Số trang cần trích xuất (None = tất cả trang)
             output_path: Đường dẫn file text đầu ra
             
         Returns:
             Đường dẫn file text
         """
         print(f"Extracting text from PDF: {pdf_path}")
+        if page_num is not None:
+            print(f"Extracting from page: {page_num}")
         
         pdf_file = fitz.open(pdf_path)
         
         all_text = []
         page_texts = []
         
-        for page_num in range(len(pdf_file)):
-            page = pdf_file.load_page(page_num)
+        # Nếu chỉ định page_num, chỉ xử lý trang đó
+        if page_num is not None:
+            page_range = [page_num]
+        else:
+            page_range = range(len(pdf_file))
+        
+        for p_num in page_range:
+            page = pdf_file.load_page(p_num)
             
             # Lấy text theo từng block
             blocks = page.get_text("dict")["blocks"]
@@ -201,7 +209,7 @@ class DatasetBuilder:
                             page_content.append(line_text)
             
             page_texts.append({
-                'page': page_num + 1,
+                'page': p_num + 1,
                 'lines': page_content
             })
             all_text.extend(page_content)
@@ -244,7 +252,7 @@ class DatasetBuilder:
         print(f"Detecting text regions in: {image_path}")
         
         # Chạy OCR
-        result = self.ocr.ocr(image_path, cls=True)
+        result = self.ocr.ocr(image_path)
         
         if result is None or len(result) == 0:
             print("No text detected")
@@ -394,33 +402,40 @@ class DatasetBuilder:
     def process_document_pair(self, 
                              image_pdf_path: str,
                              text_pdf_path: str,
-                             page_num: int = 0):
+                             image_page_num: int = 0,
+                             text_page_num: int = None):
         """
         Xử lý một cặp document: PDF ảnh + PDF text
         
         Args:
             image_pdf_path: PDF dạng ảnh
             text_pdf_path: PDF dạng text (ground truth)
-            page_num: Số trang cần xử lý (0 = trang đầu)
+            image_page_num: Số trang cần lấy ảnh (0 = trang đầu)
+            text_page_num: Số trang cần lấy text (None = dùng image_page_num)
         """
         print(f"\n{'='*60}")
         print(f"Processing document pair: {Path(image_pdf_path).name}")
+        print(f"Image page: {image_page_num}, Text page: {text_page_num if text_page_num is not None else image_page_num}")
         print(f"{'='*60}\n")
+        
+        # Nếu không chỉ định text_page_num, dùng image_page_num
+        if text_page_num is None:
+            text_page_num = image_page_num
         
         # 1. Extract ảnh từ PDF ảnh
         doc = fitz.open(image_pdf_path)
-        page = doc.load_page(page_num)
+        page = doc.load_page(image_page_num)
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x resolution
         
-        img_name = f"{Path(image_pdf_path).stem}_page{page_num}.png"
+        img_name = f"{Path(image_pdf_path).stem}_page{image_page_num}.png"
         img_path = self.dirs['raw_images'] / img_name
         pix.save(str(img_path))
         
         # 2. Tiền xử lý ảnh
         preprocessed_path = self.preprocess_image(str(img_path))
         
-        # 3. Extract ground truth text
-        gt_path = self.extract_text_from_pdf(text_pdf_path)
+        # 3. Extract ground truth text từ trang cụ thể
+        gt_path = self.extract_text_from_pdf(text_pdf_path, page_num=text_page_num)
         
         with open(gt_path, 'r', encoding='utf-8') as f:
             gt_lines = [line.strip() for line in f if line.strip()]
@@ -433,7 +448,7 @@ class DatasetBuilder:
         
         # 6. Export dataset
         self.export_dataset(preprocessed_path, aligned_data, 
-                          output_name=f"{Path(image_pdf_path).stem}_page{page_num}")
+                          output_name=f"{Path(image_pdf_path).stem}_img_p{image_page_num}_txt_p{text_page_num}")
         
         print(f"\n{'='*60}")
         print(f"Completed processing: {img_name}")
@@ -453,7 +468,8 @@ if __name__ == "__main__":
     # builder.process_document_pair(
     #     image_pdf_path="path/to/scanned.pdf",
     #     text_pdf_path="path/to/text_version.pdf",
-    #     page_num=0
+    #     image_page_num=130,  # Lấy ảnh từ trang 131 (index 130)
+    #     text_page_num=2      # Lấy text từ trang 3 (index 2)
     # )
     
     print("Dataset Builder initialized successfully!")
