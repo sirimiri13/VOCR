@@ -160,7 +160,7 @@ class BBoxGenerator:
         self.ocr = PaddleOCR(
             use_angle_cls=use_angle_cls,
             lang=lang,
-            use_gpu=use_gpu,
+            # use_gpu=use_gpu,
             show_log=False,
             # Thêm params để tăng khả năng detect và giảm lỗi
             det_db_thresh=0.3,
@@ -188,7 +188,7 @@ class BBoxGenerator:
             return []
         
         try:
-            result = self.ocr.ocr(image_path, cls=True)
+            result = self.ocr.ocr(image_path)
         except Exception as e:
             logger.error(f"OCR failed for {image_path}: {e}")
             return []
