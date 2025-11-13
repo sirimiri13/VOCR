@@ -257,15 +257,37 @@ class DatasetBuilder:
             print("No text detected")
             return []
         
+        # Kiểm tra cấu trúc kết quả
+        if result[0] is None:
+            print("No text detected in image")
+            return []
+        
         detections = []
         for line in result[0]:  # result[0] vì chỉ có 1 ảnh
+            if line is None or len(line) < 2:
+                continue
+                
             bbox = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-            text_info = line[1]  # (text, confidence)
+            text_info = line[1]  # (text, confidence) hoặc chỉ text
+            
+            # Xử lý các format khác nhau của text_info
+            if isinstance(text_info, (list, tuple)) and len(text_info) >= 2:
+                text = text_info[0]
+                confidence = text_info[1]
+            elif isinstance(text_info, (list, tuple)) and len(text_info) == 1:
+                text = text_info[0]
+                confidence = 1.0  # Default confidence
+            elif isinstance(text_info, str):
+                text = text_info
+                confidence = 1.0  # Default confidence
+            else:
+                print(f"Unexpected text_info format: {text_info}")
+                continue
             
             detection = {
                 'bbox': bbox,
-                'text': text_info[0],
-                'confidence': text_info[1]
+                'text': text,
+                'confidence': confidence
             }
             detections.append(detection)
         
