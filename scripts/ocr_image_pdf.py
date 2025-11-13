@@ -65,7 +65,7 @@ def ocr_pdf_with_paddle(pdf_path, pages=None, lang='vi', use_gpu=False, zoom=2):
         page = doc[pnum-1]
         img, w, h, zoom_used = render_page_to_pil(page, zoom=zoom)
         # PaddleOCR accepts numpy array or pil image
-        ocr_res = ocr.ocr(img, cls=True)
+        ocr_res = ocr.predict(img)
         boxes = []
         # ocr_res: list of lists -> [ [[x1,y1],[x2,y2],...], (text, conf) ]
         for i, line in enumerate(ocr_res):
