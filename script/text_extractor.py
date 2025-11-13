@@ -1,12 +1,12 @@
 """
 Bước 2 & 3: Trích xuất text từ PDF và tạo bounding boxes bằng PaddleOCR
+FIXED VERSION - Đã fix lỗi "string index out of range"
 """
 
 import PyPDF2
 from paddleocr import PaddleOCR
 import cv2
 import json
-import os
 from pathlib import Path
 from typing import List, Dict, Tuple
 import logging
@@ -81,12 +81,8 @@ class TextExtractor:
         logger.info(f"Saved {len(pages_text)} text files to {output_dir}")
 
 
-# Alias for backward compatibility
-PDFTextExtractor = TextExtractor
-
-
 class BBoxGenerator:
-    """Tạo bounding boxes bằng PaddleOCR"""
+    """Tạo bounding boxes bằng PaddleOCR - FIXED VERSION"""
     
     def __init__(self, lang='vi', use_angle_cls=True, use_gpu=False):
         """
@@ -100,138 +96,208 @@ class BBoxGenerator:
         self.ocr = PaddleOCR(
             use_angle_cls=use_angle_cls,
             lang=lang,
-            # use_gpu=use_gpu,
-            # show_log=False
+            use_gpu=use_gpu,
+            show_log=False,
+            # Thêm params để tăng khả năng detect và giảm lỗi
+            det_db_thresh=0.3,
+            det_db_box_thresh=0.5,
         )
         logger.info("PaddleOCR initialized successfully")
     
     def detect_text_regions(self, image_path: str) -> List[Dict]:
         """
-        Detect text regions trong ảnh với error handling tốt hơn
+        Detect text regions trong ảnh - FIXED VERSION với full error handling
         Returns:
             List of dict containing bbox coordinates and recognized text
         """
         logger.info(f"Detecting text in: {image_path}")
         
-        try:
-            # Kiểm tra file tồn tại
-            if not os.path.exists(image_path):
-                logger.error(f"Image file not found: {image_path}")
-                return []
-            
-            # Kiểm tra ảnh có thể đọc được không
-            import cv2
-            test_img = cv2.imread(image_path)
-            if test_img is None:
-                logger.error(f"Cannot read image: {image_path}")
-                return []
-            
-            # Chạy OCR
-            result = self.ocr.ocr(image_path)
-            
-            # Kiểm tra kết quả OCR
-            if not result:
-                logger.warning(f"OCR returned None for {image_path}")
-                return []
-                
-            if not isinstance(result, list) or len(result) == 0:
-                logger.warning(f"OCR returned empty result for {image_path}")
-                return []
-                
-            if not result[0]:
-                logger.warning(f"No text detected in {image_path}")
-                return []
-            
-            text_regions = []
-            for idx, line in enumerate(result[0]):
-                try:
-                    # Kiểm tra format của line
-                    if not isinstance(line, (list, tuple)) or len(line) < 2:
-                        logger.warning(f"Invalid line format at index {idx}: {line}")
-                        continue
-                    
-                    bbox = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-                    text_info = line[1]  # (text, confidence)
-                    
-                    # Kiểm tra bbox format
-                    if not isinstance(bbox, list) or len(bbox) != 4:
-                        logger.warning(f"Invalid bbox format at index {idx}: {bbox}")
-                        continue
-                    
-                    # Kiểm tra text_info format
-                    if not isinstance(text_info, (list, tuple)) or len(text_info) < 2:
-                        logger.warning(f"Invalid text_info format at index {idx}: {text_info}")
-                        continue
-                    
-                    text = str(text_info[0]) if text_info[0] is not None else ""
-                    confidence = float(text_info[1]) if text_info[1] is not None else 0.0
-                    
-                    # Chỉ thêm nếu có text
-                    if text.strip():
-                        text_regions.append({
-                            'id': idx,
-                            'bbox': bbox,
-                            'text': text,
-                            'confidence': confidence,
-                            'rect': self._bbox_to_rect(bbox)
-                        })
-                    
-                except Exception as line_error:
-                    logger.warning(f"Error processing line {idx}: {line_error}")
-                    continue
-            
-            logger.info(f"Detected {len(text_regions)} valid text regions")
-            return text_regions
-            
-        except Exception as e:
-            logger.error(f"Error in detect_text_regions: {e}")
+        # Validate image file
+        if not Path(image_path).exists():
+            logger.error(f"Image file not found: {image_path}")
             return []
+        
+        # Check if image is readable
+        test_img = cv2.imread(image_path)
+        if test_img is None:
+            logger.error(f"Cannot read image: {image_path}")
+            return []
+        
+        try:
+            result = self.ocr.ocr(image_path, cls=True)
+        except Exception as e:
+            logger.error(f"OCR failed for {image_path}: {e}")
+            return []
+        
+        # VALIDATION CHAIN - kiểm tra từng bước
+        if result is None:
+            logger.warning(f"OCR returned None for {image_path}")
+            return []
+        
+        if not isinstance(result, list):
+            logger.warning(f"OCR returned unexpected type: {type(result)}")
+            return []
+        
+        if len(result) == 0:
+            logger.warning(f"OCR returned empty list for {image_path}")
+            return []
+        
+        if result[0] is None:
+            logger.warning(f"No text detected in {image_path}")
+            return []
+        
+        if not isinstance(result[0], list):
+            logger.warning(f"OCR result[0] has unexpected type: {type(result[0])}")
+            return []
+        
+        if len(result[0]) == 0:
+            logger.warning(f"No text lines in {image_path}")
+            return []
+        
+        # Parse results với error handling từng line
+        text_regions = []
+        skipped_count = 0
+        
+        for idx, line in enumerate(result[0]):
+            try:
+                # Validate line structure
+                if line is None:
+                    skipped_count += 1
+                    continue
+                
+                if not isinstance(line, (list, tuple)):
+                    logger.debug(f"Line {idx}: invalid type {type(line)}")
+                    skipped_count += 1
+                    continue
+                
+                if len(line) < 2:
+                    logger.debug(f"Line {idx}: invalid length {len(line)}")
+                    skipped_count += 1
+                    continue
+                
+                bbox = line[0]
+                text_info = line[1]
+                
+                # Validate bbox
+                if bbox is None or not isinstance(bbox, (list, tuple)):
+                    logger.debug(f"Line {idx}: invalid bbox")
+                    skipped_count += 1
+                    continue
+                
+                if len(bbox) != 4:
+                    logger.debug(f"Line {idx}: bbox length != 4")
+                    skipped_count += 1
+                    continue
+                
+                # Validate text_info
+                if text_info is None or not isinstance(text_info, (list, tuple)):
+                    logger.debug(f"Line {idx}: invalid text_info")
+                    skipped_count += 1
+                    continue
+                
+                if len(text_info) < 1:
+                    logger.debug(f"Line {idx}: text_info too short")
+                    skipped_count += 1
+                    continue
+                
+                # SAFE EXTRACTION
+                text = ""
+                confidence = 0.0
+                
+                # Extract text (index 0)
+                if len(text_info) >= 1 and text_info[0] is not None:
+                    text = str(text_info[0])
+                
+                # Extract confidence (index 1)
+                if len(text_info) >= 2 and text_info[1] is not None:
+                    try:
+                        confidence = float(text_info[1])
+                    except (ValueError, TypeError):
+                        confidence = 0.0
+                
+                # Calculate rect safely
+                try:
+                    rect = self._bbox_to_rect(bbox)
+                except Exception as e:
+                    logger.debug(f"Line {idx}: failed to calculate rect: {e}")
+                    rect = {'x': 0, 'y': 0, 'width': 0, 'height': 0}
+                
+                text_regions.append({
+                    'id': idx,
+                    'bbox': bbox,
+                    'text': text,
+                    'confidence': confidence,
+                    'rect': rect
+                })
+                
+            except Exception as e:
+                logger.error(f"Error processing line {idx}: {e}")
+                skipped_count += 1
+                continue
+        
+        if skipped_count > 0:
+            logger.warning(f"Skipped {skipped_count} invalid lines")
+        
+        logger.info(f"Detected {len(text_regions)} text regions")
+        return text_regions
     
     def _bbox_to_rect(self, bbox: List[List[float]]) -> Dict[str, int]:
         """Convert bbox 4 điểm sang rectangle (x, y, width, height)"""
-        x_coords = [point[0] for point in bbox]
-        y_coords = [point[1] for point in bbox]
-        
-        x_min, x_max = int(min(x_coords)), int(max(x_coords))
-        y_min, y_max = int(min(y_coords)), int(max(y_coords))
-        
-        return {
-            'x': x_min,
-            'y': y_min,
-            'width': x_max - x_min,
-            'height': y_max - y_min
-        }
+        try:
+            x_coords = [float(point[0]) for point in bbox]
+            y_coords = [float(point[1]) for point in bbox]
+            
+            x_min, x_max = int(min(x_coords)), int(max(x_coords))
+            y_min, y_max = int(min(y_coords)), int(max(y_coords))
+            
+            return {
+                'x': x_min,
+                'y': y_min,
+                'width': x_max - x_min,
+                'height': y_max - y_min
+            }
+        except Exception as e:
+            logger.error(f"Failed to convert bbox to rect: {e}")
+            return {'x': 0, 'y': 0, 'width': 0, 'height': 0}
     
     def visualize_bboxes(self, image_path: str, text_regions: List[Dict], 
                          output_path: str = None):
         """Vẽ bounding boxes lên ảnh để kiểm tra"""
-        image = cv2.imread(image_path)
-        
-        for region in text_regions:
-            bbox = region['bbox']
-            # Chuyển bbox sang integer
-            points = [[int(x), int(y)] for x, y in bbox]
+        try:
+            image = cv2.imread(image_path)
+            if image is None:
+                logger.error(f"Cannot read image for visualization: {image_path}")
+                return None
             
-            # Vẽ polygon
-            cv2.polylines(image, [np.array(points)], True, (0, 255, 0), 2)
+            for region in text_regions:
+                bbox = region['bbox']
+                # Chuyển bbox sang integer
+                points = [[int(x), int(y)] for x, y in bbox]
+                
+                # Vẽ polygon
+                cv2.polylines(image, [np.array(points)], True, (0, 255, 0), 2)
+                
+                # Vẽ text label (nếu ảnh đủ lớn)
+                text = region['text']
+                if len(text) < 50:  # Chỉ hiển thị text ngắn
+                    cv2.putText(
+                        image, 
+                        text[:20], 
+                        (points[0][0], points[0][1] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.5, 
+                        (0, 255, 0), 
+                        1
+                    )
             
-            # Vẽ text label (nếu ảnh đủ lớn)
-            if len(region['text']) < 50:  # Chỉ hiển thị text ngắn
-                cv2.putText(
-                    image, 
-                    region['text'][:20], 
-                    (points[0][0], points[0][1] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 
-                    0.5, 
-                    (0, 255, 0), 
-                    1
-                )
-        
-        if output_path:
-            cv2.imwrite(output_path, image)
-            logger.info(f"Visualization saved to: {output_path}")
-        
-        return image
+            if output_path:
+                cv2.imwrite(output_path, image)
+                logger.info(f"Visualization saved to: {output_path}")
+            
+            return image
+        except Exception as e:
+            logger.error(f"Visualization failed: {e}")
+            return None
     
     def process_directory(self, image_dir: str, output_dir: str,
                          visualize: bool = False) -> Dict[str, List[Dict]]:
@@ -274,6 +340,8 @@ class BBoxGenerator:
                 
             except Exception as e:
                 logger.error(f"Error processing {img_file.name}: {e}")
+                # Tiếp tục với ảnh tiếp theo thay vì crash
+                all_results[img_file.name] = []
         
         # Lưu tổng hợp
         summary_file = output_path / 'all_bboxes.json'
@@ -286,7 +354,6 @@ class BBoxGenerator:
 
 # # Ví dụ sử dụng
 # if __name__ == "__main__":
-#     import numpy as np
     
 #     # Bước 1: Trích xuất text từ PDF text
 #     text_extractor = TextExtractor()
