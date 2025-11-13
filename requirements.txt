@@ -1,20 +1,19 @@
-# Core dependencies for Colab
-paddlepaddle
-paddleocr
-opencv-python
-pillow
-pymupdf
-pdf2image
-python-Levenshtein
-numpy
+# Core dependencies
+paddlepaddle-gpu>=2.5.0
+paddleocr>=2.7.0
+opencv-python>=4.8.0
+pymupdf>=1.23.0
+pillow>=10.0.0
+numpy>=1.24.0
 
-# Data science & visualization
-matplotlib
-tqdm
+# Optional but recommended
+tqdm>=4.66.0
+matplotlib>=3.7.0
+scikit-image>=0.21.0
 
-# For local development
-jupyter
-jupyterlab
-ipykernel
+# For text processing
+python-Levenshtein>=0.21.0
+rapidfuzz>=3.0.0
 
-# Note: poppler-utils will be installed via apt-get in Colab
+# Utilities
+pyyaml>=6.0
