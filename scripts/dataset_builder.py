@@ -264,7 +264,18 @@ class DatasetBuilder:
         
         detections = []
         for line in result[0]:  # result[0] vì chỉ có 1 ảnh
-            if line is None or len(line) < 2:
+            # Kiểm tra kiểu dữ liệu của line
+            if line is None:
+                continue
+                
+            # Nếu line là string, bỏ qua
+            if isinstance(line, str):
+                print(f"Skipping string line: {line}")
+                continue
+                
+            # Nếu line không phải là list/tuple hoặc không đủ phần tử
+            if not isinstance(line, (list, tuple)) or len(line) < 2:
+                print(f"Skipping invalid line format: {line}")
                 continue
                 
             bbox = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
