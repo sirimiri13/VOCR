@@ -1,6 +1,5 @@
 """
 Bước 2 & 3: Trích xuất text từ PDF và tạo bounding boxes bằng PaddleOCR
-FIXED VERSION - Đã fix lỗi "string index out of range"
 """
 
 import PyPDF2
@@ -22,6 +21,71 @@ class TextExtractor:
     
     def __init__(self):
         pass
+    
+    def extract_from_pdf(self, pdf_path: str, skip_pages: int = 2) -> Dict[int, str]:
+        """
+        Trích xuất text từ PDF, bỏ qua các trang đầu
+        Args:
+            pdf_path: đường dẫn PDF
+            skip_pages: số trang cần bỏ qua (mặc định 2 trang bìa)
+        Returns:
+            Dict {page_number: text_content}
+        """
+        logger.info(f"Extracting text from PDF: {pdf_path}")
+        
+        pages_text = {}
+        
+        with open(pdf_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            total_pages = len(pdf_reader.pages)
+            
+            logger.info(f"Total pages: {total_pages}, skipping first {skip_pages} pages")
+            
+            for page_num in range(skip_pages, total_pages):
+                page = pdf_reader.pages[page_num]
+                text = page.extract_text()
+                
+                # Chuẩn hóa text: xóa whitespace dư thừa
+                text = self.normalize_text(text)
+                
+                # Page number trong output (bắt đầu từ 0 sau khi skip)
+                pages_text[page_num - skip_pages] = text
+                
+                logger.debug(f"Page {page_num - skip_pages}: {len(text)} characters")
+        
+        logger.info(f"Extracted {len(pages_text)} pages")
+        return pages_text
+    
+    def normalize_text(self, text: str) -> str:
+        """Chuẩn hóa text"""
+        # Xóa multiple spaces
+        text = re.sub(r'\s+', ' ', text)
+        # Xóa space ở đầu/cuối dòng
+        lines = [line.strip() for line in text.split('\n')]
+        # Giữ lại cấu trúc đoạn văn
+        text = '\n'.join(lines)
+        return text.strip()
+    
+    def save_to_file(self, pages_text: Dict[int, str], output_dir: str):
+        """Lưu text theo từng trang"""
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        for page_num, text in pages_text.items():
+            output_file = output_path / f"page_{page_num:04d}.txt"
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(text)
+            logger.debug(f"Saved: {output_file}")
+        
+        logger.info(f"Saved {len(pages_text)} text files to {output_dir}")
+
+
+class PDFTextExtractor(TextExtractor):
+    """
+    Alias cho TextExtractor - để tương thích với code cũ
+    Có thể dùng cả PDFTextExtractor hoặc TextExtractor
+    """
+    pass
     
     def extract_from_pdf(self, pdf_path: str, skip_pages: int = 2) -> Dict[int, str]:
         """
@@ -351,32 +415,3 @@ class BBoxGenerator:
         logger.info(f"Processed {len(all_results)} images. Results saved to {output_dir}")
         return all_results
 
-
-# # Ví dụ sử dụng
-# if __name__ == "__main__":
-    
-#     # Bước 1: Trích xuất text từ PDF text
-#     text_extractor = TextExtractor()
-#     pages_text = text_extractor.extract_from_pdf(
-#         pdf_path="data/raw/gt/book.pdf",
-#         skip_pages=2  # Bỏ 2 trang bìa
-#     )
-    
-#     # Lưu text
-#     text_extractor.save_to_file(
-#         pages_text,
-#         output_dir="data/processed/gt"
-#     )
-    
-#     # Bước 2: Tạo bounding boxes bằng PaddleOCR
-#     bbox_generator = BBoxGenerator(lang='vi', use_gpu=False)
-    
-#     # Xử lý thư mục ảnh
-#     bbox_results = bbox_generator.process_directory(
-#         image_dir="data/processed/image",
-#         output_dir="data/processed/bbox",
-#         visualize=True  # Tạo ảnh visualization để kiểm tra
-#     )
-    
-#     print(f"Đã xử lý {len(bbox_results)} ảnh")
-#     print(f"Trích xuất {len(pages_text)} trang text")
