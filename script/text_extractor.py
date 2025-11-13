@@ -148,7 +148,7 @@ class PDFTextExtractor(TextExtractor):
 class BBoxGenerator:
     """Tạo bounding boxes bằng PaddleOCR - FIXED VERSION"""
     
-    def __init__(self, lang='vi', use_angle_cls=True, use_gpu=False):
+    def __init__(self, lang='vi', use_angle_cls=True):
         """
         Khởi tạo PaddleOCR
         Args:
