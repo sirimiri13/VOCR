@@ -38,7 +38,6 @@ class DatasetBuilder:
         self.ocr = PaddleOCR(
             use_angle_cls=True,
             lang='vi',
-            use_gpu=True,  # Sử dụng GPU trên Kaggle
         )
         
     def setup_directories(self):
