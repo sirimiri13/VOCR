@@ -1,19 +1,7 @@
-# Core dependencies
-paddlepaddle-gpu>=2.5.0
-paddleocr>=2.7.0
-opencv-python>=4.8.0
-pymupdf>=1.23.0
-pillow>=10.0.0
-numpy>=1.24.0
-
-# Optional but recommended
-tqdm>=4.66.0
-matplotlib>=3.7.0
-scikit-image>=0.21.0
-
-# For text processing
-python-Levenshtein>=0.21.0
-rapidfuzz>=3.0.0
-
-# Utilities
-pyyaml>=6.0
+paddleocr>=2.5.1
+paddlepaddle>=2.5.0        # or paddlepaddle-gpu if you have GPU (install appropriate wheel)
+pymupdf>=1.22.0            # fitz
+Pillow>=9.0.0
+rapidfuzz>=2.0.0
+tqdm
+python-dotenv
