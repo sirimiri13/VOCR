@@ -251,56 +251,81 @@ class DatasetBuilder:
         print(f"Detecting text regions in: {image_path}")
         
         # Chạy OCR
-        result = self.ocr.ocr(image_path)
-        
-        if result is None or len(result) == 0:
-            print("No text detected")
-            return []
-        
-        # Kiểm tra cấu trúc kết quả
-        if result[0] is None:
-            print("No text detected in image")
-            return []
-        
-        detections = []
-        for line in result[0]:  # result[0] vì chỉ có 1 ảnh
-            # Kiểm tra kiểu dữ liệu của line
-            if line is None:
-                continue
-                
-            # Nếu line là string, bỏ qua
-            if isinstance(line, str):
-                print(f"Skipping string line: {line}")
-                continue
-                
-            # Nếu line không phải là list/tuple hoặc không đủ phần tử
-            if not isinstance(line, (list, tuple)) or len(line) < 2:
-                print(f"Skipping invalid line format: {line}")
-                continue
-                
-            bbox = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-            text_info = line[1]  # (text, confidence) hoặc chỉ text
+        try:
+            result = self.ocr.ocr(image_path)
             
-            # Xử lý các format khác nhau của text_info
-            if isinstance(text_info, (list, tuple)) and len(text_info) >= 2:
-                text = text_info[0]
-                confidence = text_info[1]
-            elif isinstance(text_info, (list, tuple)) and len(text_info) == 1:
-                text = text_info[0]
-                confidence = 1.0  # Default confidence
-            elif isinstance(text_info, str):
-                text = text_info
-                confidence = 1.0  # Default confidence
-            else:
-                print(f"Unexpected text_info format: {text_info}")
-                continue
+            print(f"OCR result type: {type(result)}")
+            print(f"OCR result length: {len(result) if result else 0}")
+            print(f"OCR result[0] type: {type(result[0]) if result and len(result) > 0 else 'N/A'}")
             
-            detection = {
-                'bbox': bbox,
-                'text': text,
-                'confidence': confidence
-            }
-            detections.append(detection)
+            if result is None or len(result) == 0:
+                print("No text detected")
+                return []
+            
+            # Kiểm tra cấu trúc kết quả
+            if result[0] is None:
+                print("No text detected in image")
+                return []
+            
+            detections = []
+            for i, line in enumerate(result[0]):  # result[0] vì chỉ có 1 ảnh
+                try:
+                    print(f"Processing line {i}: {type(line)} - {line}")
+                    
+                    # Kiểm tra kiểu dữ liệu của line
+                    if line is None:
+                        print(f"Line {i} is None, skipping")
+                        continue
+                        
+                    # Nếu line là string, bỏ qua
+                    if isinstance(line, str):
+                        print(f"Line {i} is string: {line}")
+                        continue
+                        
+                    # Nếu line không phải là list/tuple hoặc không đủ phần tử
+                    if not isinstance(line, (list, tuple)):
+                        print(f"Line {i} is not list/tuple: {type(line)}")
+                        continue
+                        
+                    if len(line) < 2:
+                        print(f"Line {i} has insufficient elements: {len(line)}")
+                        continue
+                        
+                    bbox = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
+                    text_info = line[1]  # (text, confidence) hoặc chỉ text
+                    
+                    print(f"Line {i} - bbox: {bbox}, text_info: {text_info}")
+                    
+                    # Xử lý các format khác nhau của text_info
+                    if isinstance(text_info, (list, tuple)) and len(text_info) >= 2:
+                        text = text_info[0]
+                        confidence = text_info[1]
+                    elif isinstance(text_info, (list, tuple)) and len(text_info) == 1:
+                        text = text_info[0]
+                        confidence = 1.0  # Default confidence
+                    elif isinstance(text_info, str):
+                        text = text_info
+                        confidence = 1.0  # Default confidence
+                    else:
+                        print(f"Unexpected text_info format: {text_info}")
+                        continue
+                    
+                    detection = {
+                        'bbox': bbox,
+                        'text': text,
+                        'confidence': confidence
+                    }
+                    detections.append(detection)
+                    print(f"Successfully processed line {i}")
+                    
+                except Exception as e:
+                    print(f"Error processing line {i}: {e}")
+                    print(f"Line content: {line}")
+                    continue
+                    
+        except Exception as e:
+            print(f"Error in OCR detection: {e}")
+            return []
         
         print(f"Found {len(detections)} text regions")
         return detections
