@@ -1,7 +1,1 @@
-paddleocr>=2.5.1
-paddlepaddle>=2.5.0        # or paddlepaddle-gpu if you have GPU (install appropriate wheel)
-pymupdf>=1.22.0            # fitz
-Pillow>=9.0.0
-rapidfuzz>=2.0.0
-tqdm
-python-dotenv
+PyMuPDF
